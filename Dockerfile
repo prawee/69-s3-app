@@ -10,7 +10,7 @@ RUN npm ci --no-audit
 # Copy source code
 COPY . .
 
-# Build Strapi frontend
+# Build Strapi frontend AND compile TypeScript
 RUN npm run build
 
 # ===== Production Stage =====
@@ -25,10 +25,15 @@ RUN npm ci --no-audit --omit=dev
 # Copy built files
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/public ./public
-COPY --from=build /app/config ./config
 COPY --from=build /app/src ./src
 COPY --from=build /app/types ./types
 COPY --from=build /app/.strapi-updater.json .
+
+# Copy config files (keep .ts, Strapi will compile them)
+COPY --from=build /app/config ./config
+
+# Copy server.js for TypeScript support
+COPY server.js .
 
 # Create data directory and set permissions
 RUN mkdir -p /app/data && chown -R node:node /app
@@ -43,5 +48,5 @@ EXPOSE 1337
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:1337/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"
 
-# Start Strapi
-CMD ["node", "node_modules/@strapi/strapi/bin/strapi.js", "start"]
+# Start Strapi with distDir for TypeScript support
+CMD ["node", "server.js"]
